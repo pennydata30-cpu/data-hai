@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Input Stock & Keuangan Harian</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f4f6f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .navbar-brand {
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .nav-tabs .nav-link {
+      font-weight: 600;
+      color: #495057;
+      border-radius: 8px 8px 0 0;
+    }
+    .nav-tabs .nav-link.active {
+      background-color: #0d6efd;
+      color: #fff;
+      border-color: #0d6efd;
+    }
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .badge-masuk {
+      background-color: #198754;
+      color: white;
+    }
+    .badge-keluar {
+      background-color: #dc3545;
+      color: white;
+    }
+    .stok-minus {
+      color: #dc3545;
+      font-weight: bold;
+    }
+    .stok-aman {
+      color: #198754;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <nav class="navbar navbar-dark bg-dark mb-4 shadow-sm">
+    <div class="container">
+      <span class="navbar-brand mb-0 h1">📊 DATA HARIAN STOCK & KEUANGAN</span>
+      <span class="text-light small">Sinkronisasi Otomatis Google Sheets</span>
+    </div>
+  </nav>
+
+  <div class="container pb-5">
+    <!-- Notifikasi Alert -->
+    <div id="alertBox" class="alert d-none alert-dismissible fade show" role="alert">
+      <span id="alertMessage"></span>
+      <button type="button" class="btn-close" onclick="hideAlert()"></button>
+    </div>
+
+    <!-- Navigasi 3 Tab Utama -->
+    <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab1-btn" data-bs-toggle="tab" data-bs-target="#tab1" type="button" role="tab">
+          📦 TAB 1: IN/OUT BAHAN BAKU
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab2-btn" data-bs-toggle="tab" data-bs-target="#tab2" type="button" role="tab">
+          💰 TAB 2: REPORT DAILY KEUANGAN
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab3-btn" data-bs-toggle="tab" data-bs-target="#tab3" type="button" role="tab" onclick="loadRekapStok()">
+          📋 TAB 3: REKAP STOK GUDANG
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="mainTabsContent">
+      
+      <!-- ========================================== -->
+      <!-- TAB 1: IN/OUT BAHAN BAKU                   -->
+      <!-- ========================================== -->
+      <div class="tab-pane fade show active" id="tab1" role="tabpanel">
+        <div class="card p-4 mb-4">
+          <h5 class="card-title mb-3 text-primary fw-bold">Form Input Stock Masuk / Keluar Bahan Baku</h5>
+          <form id="formBahanBaku" onsubmit="submitBahanBaku(event)">
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Tanggal Pengisian</label>
+                <input type="date" id="t1_tanggal" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Lokasi / Divisi</label>
+                <select id="t1_lokasi" class="form-select" required>
+                  <option value="62">62</option>
+                  <option value="DAPUR">DAPUR</option>
+                  <option value="SSS">SSS</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Nama PIC</label>
+                <input type="text" id="t1_pic" class="form-control" placeholder="Masukkan nama PIC..." required>
+              </div>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="fw-bold mb-0">Daftar Bahan Baku</h6>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="tambahBarisItem()">
+                + Tambah Baris Bahan
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-bordered align-middle" id="tabelInputItem">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 32%;">Nama Bahan Baku</th>
+                    <th style="width: 18%;">Jenis</th>
+                    <th style="width: 15%;">Qty</th>
+                    <th style="width: 27%;">Keterangan / Satuan</th>
+                    <th style="width: 8%;" class="text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyItems">
+                  <!-- Baris item digenerate oleh JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+              <button type="submit" id="btnSubmitTab1" class="btn btn-primary px-4 fw-semibold">
+                Simpan ke TAB 1 & Update Rekap
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Riwayat Input Terakhir Tab 1 -->
+        <div class="card p-4">
+          <h6 class="fw-bold mb-3">Riwayat Input Bahan Baku Terakhir (Sync Spreadsheet)</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Lokasi</th>
+                  <th>Nama Bahan</th>
+                  <th>Jenis</th>
+                  <th>Qty</th>
+                  <th>Keterangan</th>
+                  <th>PIC</th>
+                </tr>
+              </thead>
+              <tbody id="riwayatTab1">
+                <tr><td colspan="7" class="text-center text-muted">Memuat data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 2: REPORT DAILY KEUANGAN               -->
+      <!-- ========================================== -->
+      <div class="tab-pane fade" id="tab2" role="tabpanel">
+        <div class="card p-4 mb-4">
+          <h5 class="card-title mb-3 text-success fw-bold">Form Report Daily Keuangan</h5>
+          <form id="formKeuangan" onsubmit="submitKeuangan(event)">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Tanggal Laporan</label>
+                <input type="date" id="t2_tanggal" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Outlet</label>
+                <select id="t2_outlet" class="form-select" required>
+                  <option value="62">62</option>
+                  <option value="SSS">SSS</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Nama PIC</label>
+                <input type="text" id="t2_pic" class="form-control" placeholder="Masukkan nama PIC..." required>
+              </div>
+
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">Amount Overall (Rp)</label>
+                <input type="number" id="t2_overall" class="form-control" placeholder="0" min="0" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">Pengeluaran (Rp)</label>
+                <input type="number" id="t2_pengeluaran" class="form-control" placeholder="0" min="0" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">Cash (Rp)</label>
+                <input type="number" id="t2_cash" class="form-control" placeholder="0" min="0" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">QRIS (Rp)</label>
+                <input type="number" id="t2_qris" class="form-control" placeholder="0" min="0" required>
+              </div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+              <button type="submit" id="btnSubmitTab2" class="btn btn-success px-4 fw-semibold">
+                Simpan Report Keuangan ke TAB 2
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Riwayat Input Terakhir Tab 2 -->
+        <div class="card p-4">
+          <h6 class="fw-bold mb-3">Riwayat Report Keuangan Terakhir (Sync Spreadsheet)</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Outlet</th>
+                  <th>PIC</th>
+                  <th>Amount Overall</th>
+                  <th>Pengeluaran</th>
+                  <th>Cash</th>
+                  <th>QRIS</th>
+                </tr>
+              </thead>
+              <tbody id="riwayatTab2">
+                <tr><td colspan="7" class="text-center text-muted">Memuat data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 3: REKAP STOK GUDANG                   -->
+      <!-- ========================================== -->
+      <div class="tab-pane fade" id="tab3" role="tabpanel">
+        <div class="card p-4">
+          <div class="row align-items-center mb-3 g-2">
+            <div class="col-md-5">
+              <h5 class="card-title mb-0 fw-bold text-dark">Rekapitulasi Stock Masuk & Keluar (Dari Tab 1)</h5>
+            </div>
+            <div class="col-md-7 d-flex justify-content-md-end gap-2 flex-wrap">
+              <input type="date" id="filterTanggalRekap" class="form-control form-control-sm" style="width: auto;">
+              <button class="btn btn-sm btn-primary" onclick="loadRekapStok(true)">Filter Tanggal</button>
+              <button class="btn btn-sm btn-secondary" onclick="resetFilterRekap()">Tampilkan Semua Total</button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <input type="text" id="cariBahan" class="form-control form-control-sm" placeholder="🔍 Cari nama bahan baku..." onkeyup="filterTabelRekap()">
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle" id="tabelRekap">
+              <thead class="table-dark">
+                <tr>
+                  <th>No</th>
+                  <th>Nama Bahan Baku</th>
+                  <th class="text-center">Total Masuk</th>
+                  <th class="text-center">Total Keluar</th>
+                  <th class="text-center">Sisa Stok</th>
+                  <th>Keterangan Terakhir</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyRekap">
+                <tr><td colspan="6" class="text-center text-muted">Memuat rekapan stok...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Daftar Master Bahan Baku sesuai Spreadsheet
+    const MASTER_BAHAN = [
+      "BEANS", "HUZELNUT", "BUBBLEGUM", "MANGGA", "STRAWBERRY", "VANILLA",
+      "BUTTERSCOTCH", "BANANA", "CHINAMON", "PISTACHIO", "MATCHA PURE",
+      "MATCHA LATTE", "CHOCOLATE", "RED VELVET", "HOJICHA", "CHEESE CAKE",
+      "LYCHEE TEA", "BLACK TEA", "MAXTEA", "AMPEC CREAMER",
+      "UKURAN 24", "UKURAN 20", "PLASTIK CUP 10x30", "BOTOL 1L", "BOTOL 500ml",
+      "SPAGHETTI LAF", "TEPUNG ROTI PRIMERA", "KECAP MANIS ANGGUR",
+      "KECAP ASIN ANGGUR", "SAUS TIRAM", "KEJU TOP CHIZ", "KEJU KRAFT FILLING",
+      "KNOOR AYAM", "SAUCE TOMAT", "SAUCE CABE", "PROCHIZ MAYO",
+      "MOTHER CHOICE", "KEJU", "MINYAK WIJEN", "BERAS KARUNGAN", "HAND GLOVE"
+    ];
+
+    // Set tanggal hari ini secara default saat halaman dibuka
+    window.onload = function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('t1_tanggal').value = today;
+      document.getElementById('t2_tanggal').value = today;
+      
+      tambahBarisItem();
+      loadRiwayat();
+      loadRekapStok(false);
+    };
+
+    function showAlert(msg, type = 'success') {
+      const box = document.getElementById('alertBox');
+      box.className = `alert alert-${type} alert-dismissible fade show`;
+      document.getElementById('alertMessage').innerText = msg;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function hideAlert() {
+      document.getElementById('alertBox').classList.add('d-none');
+    }
+
+    // Tambah baris dinamis pada Tab 1
+    function tambahBarisItem() {
+      const tbody = document.getElementById('tbodyItems');
+      const tr = document.createElement('tr');
+      
+      let optionsHtml = MASTER_BAHAN.map(b => `<option value="${b}">${b}</option>`).join('');
+      
+      tr.innerHTML = `
+        <td>
+          <select class="form-select form-select-sm item-nama" required>
+            ${optionsHtml}
+          </select>
+        </td>
+        <td>
+          <select class="form-select form-select-sm item-jenis" required>
+            <option value="MASUK">MASUK</option>
+            <option value="KELUAR">KELUAR</option>
+          </select>
+        </td>
+        <td>
+          <input type="number" class="form-control form-control-sm item-qty" min="1" step="any" placeholder="0" required>
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm item-ket" placeholder="Contoh: Pack / Pcs / Gr">
+        </td>
+        <td class="text-center">
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisItem(this)">✕</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function hapusBarisItem(btn) {
+      const tbody = document.getElementById('tbodyItems');
+      if (tbody.rows.length > 1) {
+        btn.closest('tr').remove();
+      } else {
+        alert('Minimal harus ada 1 baris item.');
+      }
+    }
+
+    // Submit Tab 1
+    function submitBahanBaku(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitTab1');
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+
+      const rows = document.querySelectorAll('#tbodyItems tr');
+      const items = [];
+      rows.forEach(r => {
+        items.push({
+          namaBahan: r.querySelector('.item-nama').value,
+          jenis: r.querySelector('.item-jenis').value,
+          qty: r.querySelector('.item-qty').value,
+          keterangan: r.querySelector('.item-ket').value
+        });
+      });
+
+      const payload = {
+        tanggal: document.getElementById('t1_tanggal').value,
+        lokasi: document.getElementById('t1_lokasi').value,
+        pic: document.getElementById('t1_pic').value,
+        items: items
+      };
+
+      google.script.run
+        .withSuccessHandler(res => {
+          btn.disabled = false;
+          btn.innerText = 'Simpan ke TAB 1 & Update Rekap';
+          if (res.status === 'success') {
+            showAlert(res.message, 'success');
+            document.getElementById('tbodyItems').innerHTML = '';
+            tambahBarisItem();
+            loadRiwayat();
+            loadRekapStok(false);
+          } else {
+            showAlert('Gagal: ' + res.message, 'danger');
+          }
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false;
+          btn.innerText = 'Simpan ke TAB 1 & Update Rekap';
+          showAlert('Error sistem: ' + err.message, 'danger');
+        })
+        .simpanBahanBaku(payload);
+    }
+
+    // Submit Tab 2
+    function submitKeuangan(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitTab2');
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+
+      const payload = {
+        tanggal: document.getElementById('t2_tanggal').value,
+        outlet: document.getElementById('t2_outlet').value,
+        pic: document.getElementById('t2_pic').value,
+        amountOverall: document.getElementById('t2_overall').value,
+        pengeluaran: document.getElementById('t2_pengeluaran').value,
+        cash: document.getElementById('t2_cash').value,
+        qris: document.getElementById('t2_qris').value
+      };
+
+      google.script.run
+        .withSuccessHandler(res => {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Report Keuangan ke TAB 2';
+          if (res.status === 'success') {
+            showAlert(res.message, 'success');
+            document.getElementById('t2_overall').value = '';
+            document.getElementById('t2_pengeluaran').value = '';
+            document.getElementById('t2_cash').value = '';
+            document.getElementById('t2_qris').value = '';
+            loadRiwayat();
+          } else {
+            showAlert('Gagal: ' + res.message, 'danger');
+          }
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Report Keuangan ke TAB 2';
+          showAlert('Error sistem: ' + err.message, 'danger');
+        })
+        .simpanKeuangan(payload);
+    }
+
+    // Load Riwayat Tab 1 & Tab 2
+    function loadRiwayat() {
+      google.script.run.withSuccessHandler(data => {
+        const tbody1 = document.getElementById('riwayatTab1');
+        if (data.bahanBaku.length === 0) {
+          tbody1.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Belum ada data.</td></tr>';
+        } else {
+          tbody1.innerHTML = data.bahanBaku.map(r => `
+            <tr>
+              <td>${r.tanggal}</td>
+              <td><span class="badge bg-secondary">${r.lokasi}</span></td>
+              <td class="fw-semibold">${r.nama}</td>
+              <td><span class="badge ${r.jenis === 'MASUK' ? 'badge-masuk' : 'badge-keluar'}">${r.jenis}</span></td>
+              <td>${r.qty}</td>
+              <td>${r.keterangan || '-'}</td>
+              <td>${r.pic}</td>
+            </tr>
+          `).join('');
+        }
+
+        const tbody2 = document.getElementById('riwayatTab2');
+        const fmt = num => 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+        if (data.keuangan.length === 0) {
+          tbody2.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Belum ada data.</td></tr>';
+        } else {
+          tbody2.innerHTML = data.keuangan.map(r => `
+            <tr>
+              <td>${r.tanggal}</td>
+              <td><span class="badge bg-info text-dark">${r.outlet}</span></td>
+              <td>${r.pic}</td>
+              <td class="fw-semibold">${fmt(r.overall)}</td>
+              <td class="text-danger">${fmt(r.pengeluaran)}</td>
+              <td>${fmt(r.cash)}</td>
+              <td>${fmt(r.qris)}</td>
+            </tr>
+          `).join('');
+        }
+      }).getRiwayatTerbaru();
+    }
+
+    // Load Rekap Stok Tab 3
+    function loadRekapStok(useFilter = false) {
+      const tbody = document.getElementById('tbodyRekap');
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Menghitung rekapan dari Tab 1...</td></tr>';
+
+      const filterTgl = useFilter ? document.getElementById('filterTanggalRekap').value : null;
+
+      google.script.run.withSuccessHandler(list => {
+        if (!list || list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Tidak ada data pada tanggal ini.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = list.map((item, idx) => `
+          <tr>
+            <td>${idx + 1}</td>
+            <td class="fw-semibold">${item.nama}</td>
+            <td class="text-center text-success fw-bold">${item.masuk}</td>
+            <td class="text-center text-danger fw-bold">${item.keluar}</td>
+            <td class="text-center ${item.sisa <= 0 ? 'stok-minus' : 'stok-aman'}">${item.sisa}</td>
+            <td>${item.keterangan}</td>
+          </tr>
+        `).join('');
+      }).getRekapStok(filterTgl);
+    }
+
+    function resetFilterRekap() {
+      document.getElementById('filterTanggalRekap').value = '';
+      loadRekapStok(false);
+    }
+
+    function filterTabelRekap() {
+      const keyword = document.getElementById('cariBahan').value.toUpperCase();
+      const rows = document.querySelectorAll('#tbodyRekap tr');
+      rows.forEach(row => {
+        const text = row.innerText.toUpperCase();
+        row.style.display = text.includes(keyword) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
